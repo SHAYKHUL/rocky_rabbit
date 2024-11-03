@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stored User Data</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            margin: 20px;
+        }
+        h1 {
+            margin-bottom: 30px;
+            text-align: center;
+            color: #343a40;
+        }
+        .table {
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tr:hover {
+            background-color: #e9ecef;
+            cursor: pointer;
+        }
+        .modal-header {
+            background-color: #007bff;
+            color: white;
+        }
+        .system-info {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .modal-content {
+            border-radius: 8px;
+        }
+        .highlight {
+            background-color: yellow; /* Highlight color */
+        }
+        .single-line {
+            white-space: nowrap; /* Prevent text from wrapping */
+            overflow: hidden;    /* Hide overflow text */
+            text-overflow: ellipsis; /* Show ellipsis (...) for overflowing text */
+            max-width: 200px;    /* Set a max width for the cell */
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+    <h1>Stored User Data</h1>
+    <div class="table-responsive">
+        <table id="userTable" class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Password (Raw)</th>
+                    <th>Salt (Raw)</th>
+                    <th>System Info Summary</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr data-toggle="modal" data-target="#systemInfoModal{{ loop.index }}">
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.password }}</td>
+                        <td>{{ user.salt }}</td>
+                        <td class="single-line">
+                            {% if user.system_info %}
+                                {% set summary = user.system_info | tojson(indent=2) %}
+                                {{ summary[:50] }}{{ summary|length > 50 and "..." or "" }}
+                            {% else %}
+                                No Info Available
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <div class="modal fade" id="systemInfoModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="systemInfoModalLabel{{ loop.index }}" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="systemInfoModalLabel{{ loop.index }}">System Info for {{ user.username }}</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    {% for key, value in user.system_info.items() %}
+                                        <h6>{{ key }}</h6>
+                                        <pre class="system-info">{{ value | tojson(indent=2) }}</pre>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            const table = $('#userTable').DataTable({
+                paging: true,
+                searching: true,
+                ordering: true,
+                info: true,
+                pageLength: 10,
+                lengthMenu: [5, 10, 25, 50],
+            });
+
+            // Highlight search term in results
+            $('#userTable_filter input').on('keyup', function() {
+                const searchTerm = this.value;
+                table.rows().every(function() {
+                    const rowData = this.data();
+                    $(this.node()).find('td').each(function() {
+                        const cell = $(this);
+                        const cellHtml = cell.text();
+                        const regex = new RegExp(searchTerm, 'gi');
+                        cell.html(cellHtml.replace(regex, (match) => `<span class="highlight">${match}</span>`));
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
